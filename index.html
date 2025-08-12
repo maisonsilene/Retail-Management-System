@@ -173,354 +173,414 @@ function SalesTab({ products, onCheckout, saleDate, setSaleDate, daySales, dayRe
 
   const selected = products.find((p) => p.id === productId);
 
-      const [cart, setCart] = useState([]); // [{productId, qty}]
-      const [feedback, setFeedback] = useState("");
+  const cartDetailed = cart.map((line) => {
+    const p = products.find((x) => x.id === line.productId);
+    const unit = p?.price || 0;
+    return { ...line, name: p?.name || line.productId, unitPrice: unit, total: unit * line.qty, stock: p?.stock || 0 };
+  });
 
-      useEffect(() => {
-        if (!products.find((p) => p.id === productId) && products.length > 0) {
-          setProductId(products[0].id);
-        }
-      }, [products, productId]);
+  const cartTotal = cartDetailed.reduce((a, l) => a + l.total, 0);
 
-      const selected = products.find((p) => p.id === productId);
-
-      const cartDetailed = cart.map((line) => {
-        const p = products.find((x) => x.id === line.productId);
-        const unit = p?.price || 0;
-        return { ...line, name: p?.name || line.productId, unitPrice: unit, total: unit * line.qty, stock: p?.stock || 0 };
-      });
-
-      const cartTotal = cartDetailed.reduce((a, l) => a + l.total, 0);
-
-      function addToCart() {
-        const q = Number(qty);
-        if (!selected) return;
-        if (!q || q <= 0) { setFeedback("Quantité invalide."); return; }
-        setFeedback("");
-        setCart((c) => {
-          const idx = c.findIndex((l) => l.productId === selected.id);
-          if (idx >= 0) {
-            const clone = [...c];
-            clone[idx] = { ...clone[idx], qty: clone[idx].qty + q };
-            return clone;
-          }
-          return [...c, { productId: selected.id, qty: q }];
-        });
+  function addToCart() {
+    const q = Number(qty);
+    if (!selected) return;
+    if (!q || q <= 0) { setFeedback("Quantité invalide."); return; }
+    setFeedback("");
+    setCart((c) => {
+      const idx = c.findIndex((l) => l.productId === selected.id);
+      if (idx >= 0) {
+        const clone = [...c];
+        clone[idx] = { ...clone[idx], qty: clone[idx].qty + q };
+        return clone;
       }
+      return [...c, { productId: selected.id, qty: q }];
+    });
+  }
 
-      function removeFromCart(i) { setCart((c) => c.filter((_, idx) => idx !== i)); }
-      function clearCart() { setCart([]); }
+  function removeFromCart(i) { setCart((c) => c.filter((_, idx) => idx !== i)); }
+  function clearCart() { setCart([]); }
 
-      function checkout() {
-        if (cart.length === 0) { setFeedback("Panier vide. Ajoute au moins un article."); return; }
-        // Vérifie stocks
-        for (const l of cartDetailed) {
-          if (l.qty > l.stock) { setFeedback(`Stock insuffisant pour ${l.name} (dispo ${l.stock}).`); return; }
-        }
-        const ts = ymdToTimestamp(saleDate);
-        onCheckout({ lines: cartDetailed, ts, client });
-        clearCart();
-        setQty(1);
-        setFeedback("✅ Vente enregistrée.");
-      }
+  function checkout() {
+    if (cart.length === 0) { setFeedback("Panier vide. Ajoute au moins un article."); return; }
+    // Vérifie stocks
+    for (const l of cartDetailed) {
+      if (l.qty > l.stock) { setFeedback(`Stock insuffisant pour ${l.name} (dispo ${l.stock}).`); return; }
+    }
+    const ts = ymdToTimestamp(saleDate);
+    onCheckout({ lines: cartDetailed, ts, client });
+    clearCart();
+    setQty(1);
+    setFeedback("✅ Vente enregistrée.");
+  }
 
-      return (
-        <div className="grid lg:grid-cols-2 gap-4">
-          {/* Colonne gauche : prise de commande */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-lg font-semibold">Caisse — Nouvelle vente</h2>
-                <div className="text-xs text-neutral-400">Choisis une date, ajoute plusieurs articles puis encaisse.</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-neutral-300">Date</label>
-                <input type="date" value={saleDate} onChange={(e)=>setSaleDate(e.target.value)} className="bg-transparent border border-white/10 rounded-lg px-2 py-1" />
-              </div>
+  const dayItems = useMemo(() => daySales.reduce((a, s) => a + (s.qty || 0), 0), [daySales]);
+  const dayOrdersCount = useMemo(() => new Set(daySales.map((s) => s.orderId)).size, [daySales]);
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-4">
+      {/* Colonne gauche : prise de commande */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold">Caisse - Nouvelle vente</h2>
+            <div className="text-xs text-neutral-400">Choisis une date, ajoute plusieurs articles puis encaisse.</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-neutral-300">Date</label>
+            <input type="date" value={saleDate} onChange={(e)=>setSaleDate(e.target.value)} className="bg-transparent border border-white/10 rounded-lg px-2 py-1" />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {feedback && (
+            <div className="text-sm border border-white/15 bg-white/5 rounded-lg px-3 py-2">{feedback}</div>
+          )}
+
+          <div>
+            <label className="text-sm text-neutral-300">Client (optionnel)</label>
+            <input
+              value={client}
+              onChange={(e)=>setClient(e.target.value)}
+              placeholder="Nom / info ticket"
+              className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-neutral-300">Référence</label>
+            <select
+              className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id} className="bg-neutral-900">
+                  {p.id} - {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 items-end">
+            <div>
+              <label className="text-sm text-neutral-300">Quantité</label>
+              <input
+                type="number" min={1}
+                className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
+                value={qty}
+                onChange={(e) => setQty(parseInt(e.target.value || "1", 10))}
+              />
             </div>
-
-            <div className="space-y-3">
-              {feedback && (
-                <div className="text-sm border border-white/15 bg-white/5 rounded-lg px-3 py-2">{feedback}</div>
-              )}
-
-              <div>
-                <label className="text-sm text-neutral-300">Client (optionnel)</label>
-                <input
-                  value={client}
-                  onChange={(e)=>setClient(e.target.value)}
-                  placeholder="Nom / info ticket"
-                  className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-neutral-300">Référence</label>
-                <select
-                  className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
-                  value={productId}
-                  onChange={(e) => setProductId(e.target.value)}
-                >
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id} className="bg-neutral-900">
-                      {p.id} — {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 items-end">
-                <div>
-                  <label className="text-sm text-neutral-300">Quantité</label>
-                  <input
-                    type="number" min={1}
-                    className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
-                    value={qty}
-                    onChange={(e) => setQty(parseInt(e.target.value || "1", 10))}
-                  />
-                </div>
-                <div>
-                  <div className="text-sm text-neutral-300">Stock dispo</div>
-                  <div className="text-xl font-semibold">{selected ? selected.stock : 0}</div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-sm pt-2">
-                <div className="text-neutral-300">Prix unitaire</div>
-                <div className="font-medium">{currency(selected?.price || 0)}</div>
-              </div>
-              <div className="flex items-center justify-between text-base">
-                <div className="text-neutral-300">Sous-total</div>
-                <div className="text-lg font-semibold">{currency((selected?.price || 0) * (qty || 0))}</div>
-              </div>
-
-              <div className="flex gap-2">
-                <button onClick={addToCart} className="flex-1 px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10 font-medium">Ajouter au panier</button>
-                <button onClick={clearCart} className="px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10">Vider</button>
-              </div>
-
-              <div className="mt-4">
-                <div className="text-sm text-neutral-300 mb-2">Panier</div>
-                {cartDetailed.length === 0 ? (
-                  <div className="text-neutral-400 text-sm">Aucun article.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="text-neutral-300">
-                        <tr>
-                          <th className="py-2 pr-4">Réf.</th>
-                          <th className="py-2 pr-4">Nom</th>
-                          <th className="py-2 pr-4">Qté</th>
-                          <th className="py-2 pr-4">PU</th>
-                          <th className="py-2 pr-4">Total</th>
-                          <th className="py-2 pr-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {cartDetailed.map((l, i) => (
-                          <tr key={i} className="border-t border-white/10">
-                            <td className="py-2 pr-4">{l.productId}</td>
-                            <td className="py-2 pr-4">{l.name}</td>
-                            <td className="py-2 pr-4">{l.qty}</td>
-                            <td className="py-2 pr-4">{currency(l.unitPrice)}</td>
-                            <td className="py-2 pr-4">{currency(l.total)}</td>
-                            <td className="py-2 pr-4 text-right">
-                              <button onClick={() => removeFromCart(i)} className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs">Supprimer</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td colSpan="4" className="py-2 pr-4 text-right font-medium">Total panier</td>
-                          <td className="py-2 pr-4 font-semibold">{currency(cartTotal)}</td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={checkout}
-                disabled={cart.length===0}
-                className="w-full mt-3 px-4 py-3 rounded-xl font-semibold bg-emerald-500 text-black hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 transition disabled:bg-emerald-500/20 disabled:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Encaisser
-              </button>
+            <div>
+              <div className="text-sm text-neutral-300">Stock dispo</div>
+              <div className="text-xl font-semibold">{selected ? selected.stock : 0}</div>
             </div>
           </div>
 
-          {/* Colonne droite : Commandes du jour */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Commandes du jour</h2>
-              <div className="text-sm">CA du {saleDate.split("-").reverse().join("/")}: <span className="font-semibold">{currency(dayRevenue)}</span></div>
-            </div>
-            {daySales.length === 0 ? (
-              <div className="text-neutral-400 text-sm">Aucune vente pour cette date.</div>
+          <div className="flex items-center justify-between text-sm pt-2">
+            <div className="text-neutral-300">Prix unitaire</div>
+            <div className="font-medium">{currency(selected?.price || 0)}</div>
+          </div>
+          <div className="flex items-center justify-between text-base">
+            <div className="text-neutral-300">Sous-total</div>
+            <div className="text-lg font-semibold">{currency((selected?.price || 0) * (qty || 0))}</div>
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={addToCart} className="flex-1 px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10 font-medium">Ajouter au panier</button>
+            <button onClick={clearCart} className="px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10">Vider</button>
+          </div>
+
+          <div className="mt-4">
+            <div className="text-sm text-neutral-300 mb-2">Panier</div>
+            {cartDetailed.length === 0 ? (
+              <div className="text-neutral-400 text-sm">Aucun article.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="text-neutral-300">
                     <tr>
-                      <th className="py-2 pr-4">Heure</th>
-                      <th className="py-2 pr-4">Commande</th>
-                      <th className="py-2 pr-4">Client</th>
                       <th className="py-2 pr-4">Réf.</th>
+                      <th className="py-2 pr-4">Nom</th>
                       <th className="py-2 pr-4">Qté</th>
                       <th className="py-2 pr-4">PU</th>
                       <th className="py-2 pr-4">Total</th>
+                      <th className="py-2 pr-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {daySales.map((s) => (
-                      <tr key={s.id} className="border-t border-white/10">
-                        <td className="py-2 pr-4">{new Date(s.ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</td>
-                        <td className="py-2 pr-4">{s.orderId}</td>
-                        <td className="py-2 pr-4">{s.client || "—"}</td>
-                        <td className="py-2 pr-4">{s.productId}</td>
-                        <td className="py-2 pr-4">{s.qty}</td>
-                        <td className="py-2 pr-4">{currency(s.unitPrice)}</td>
-                        <td className="py-2 pr-4 font-medium">{currency(s.total)}</td>
+                    {cartDetailed.map((l, i) => (
+                      <tr key={i} className="border-t border-white/10">
+                        <td className="py-2 pr-4">{l.productId}</td>
+                        <td className="py-2 pr-4">{l.name}</td>
+                        <td className="py-2 pr-4">{l.qty}</td>
+                        <td className="py-2 pr-4">{currency(l.unitPrice)}</td>
+                        <td className="py-2 pr-4">{currency(l.total)}</td>
+                        <td className="py-2 pr-4 text-right">
+                          <button onClick={() => removeFromCart(i)} className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs">Supprimer</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={4} className="py-2 pr-4 text-right font-medium">Total panier</td>
+                      <td className="py-2 pr-4 font-semibold">{currency(cartTotal)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
           </div>
+
+          <button
+            onClick={checkout}
+            disabled={cart.length===0}
+            className="w-full mt-3 px-4 py-3 rounded-xl font-semibold bg-emerald-500 text-black hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 transition disabled:bg-emerald-500/20 disabled:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Encaisser
+          </button>
         </div>
-      );
-    }
+      </div>
 
-    // ===== App =====
-    function App() {
-      const [tab, setTab] = useState("ventes"); // "stock" | "ventes"
-      const [data, setData] = useState(loadData());
-      const [saleDate, setSaleDate] = useState(todayYMD());
+      {/* Colonne droite : Commandes du jour */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Commandes du jour</h2>
+          <div className="text-sm">CA du {saleDate.split("-").reverse().join("/")}: <span className="font-semibold">{currency(dayRevenue)}</span></div>
+        </div>
+        {daySales.length === 0 ? (
+          <div className="text-neutral-400 text-sm">Aucune vente pour cette date.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-neutral-300">
+                <tr>
+                  <th className="py-2 pr-4">Heure</th>
+                  <th className="py-2 pr-4">Commande</th>
+                  <th className="py-2 pr-4">Client</th>
+                  <th className="py-2 pr-4">Réf.</th>
+                  <th className="py-2 pr-4">Qté</th>
+                  <th className="py-2 pr-4">PU</th>
+                  <th className="py-2 pr-4">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {daySales.map((s) => (
+                  <tr key={s.id} className="border-t border-white/10">
+                    <td className="py-2 pr-4">{new Date(s.ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</td>
+                    <td className="py-2 pr-4">{s.orderId}</td>
+                    <td className="py-2 pr-4">{s.client || "—"}</td>
+                    <td className="py-2 pr-4">{s.productId}</td>
+                    <td className="py-2 pr-4">{s.qty}</td>
+                    <td className="py-2 pr-4">{currency(s.unitPrice)}</td>
+                    <td className="py-2 pr-4 font-medium">{currency(s.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
-      useEffect(() => { saveData(data); }, [data]);
+// ===== App =====
+export default function App() {
+  const [tab, setTab] = useState("ventes"); // "stock" | "ventes"
+  const [data, setData] = useState(loadData());
+  const [saleDate, setSaleDate] = useState(todayYMD());
 
-      const totalStockValue = useMemo(
-        () => data.products.reduce((acc, p) => acc + (p.stock || 0) * (p.price || 0), 0),
-        [data.products]
-      );
+  useEffect(() => { saveData(data); }, [data]);
 
-      // KPIs (caisse) calculés sur la date sélectionnée
-      const daySales = useMemo(
-        () => data.sales.filter((s) => tsToYMD(s.ts) === saleDate),
-        [data.sales, saleDate]
-      );
-      const dayRevenue = useMemo(
-        () => daySales.reduce((a, s) => a + s.total, 0),
-        [daySales]
-      );
-      const dayItems = useMemo(
-        () => daySales.reduce((a, s) => a + (s.qty || 0), 0),
-        [daySales]
-      );
-      const dayOrdersCount = useMemo(
-        () => new Set(daySales.map((s) => s.orderId)).size,
-        [daySales]
-      );
+  const totalStockValue = useMemo(
+    () => data.products.reduce((acc, p) => acc + (p.stock || 0) * (p.price || 0), 0),
+    [data.products]
+  );
 
-      function updateProduct(idx, partial) {
-        setData((d) => {
-          const products = [...d.products];
-          products[idx] = { ...products[idx], ...partial };
-          return { ...d, products };
-        });
+  // KPIs (caisse) calculés sur la date sélectionnée
+  const daySales = useMemo(
+    () => data.sales.filter((s) => tsToYMD(s.ts) === saleDate),
+    [data.sales, saleDate]
+  );
+  const dayRevenue = useMemo(
+    () => daySales.reduce((a, s) => a + s.total, 0),
+    [daySales]
+  );
+  const dayItems = useMemo(
+    () => daySales.reduce((a, s) => a + (s.qty || 0), 0),
+    [daySales]
+  );
+  const dayOrdersCount = useMemo(
+    () => new Set(daySales.map((s) => s.orderId)).size,
+    [daySales]
+  );
+
+  function updateProduct(idx, partial) {
+    setData((d) => {
+      const products = [...d.products];
+      products[idx] = { ...products[idx], ...partial };
+      return { ...d, products };
+    });
+  }
+
+  function addProduct() {
+    const newId = suggestId(data.products);
+    setData((d) => ({
+      ...d,
+      products: [...d.products, { id: newId, name: "Nouvelle réf.", price: 0, stock: 0 }],
+    }));
+  }
+
+  function removeProduct(idx) {
+    setData((d) => {
+      const prod = d.products[idx];
+      const hasSales = d.sales.some((s) => s.productId === prod.id);
+      if (hasSales) {
+        alert("Impossible de supprimer : des ventes existent pour cette référence.");
+        return d;
       }
+      const products = d.products.filter((_, i) => i !== idx);
+      return { ...d, products };
+    });
+  }
 
-      function addProduct() {
-        const newId = suggestId(data.products);
-        setData((d) => ({
-          ...d,
-          products: [...d.products, { id: newId, name: "Nouvelle réf.", price: 0, stock: 0 }],
-        }));
-      }
+  function checkoutOrder({ lines, ts, client }) {
+    const orderId = `O-${Date.now()}`;
+    // décrémente les stocks (somme des quantités par produit)
+    const decrements = lines.reduce((map, l) => {
+      map[l.productId] = (map[l.productId] || 0) + l.qty;
+      return map;
+    }, {});
 
-      function removeProduct(idx) {
-        setData((d) => {
-          const prod = d.products[idx];
-          const hasSales = d.sales.some((s) => s.productId === prod.id);
-          if (hasSales) {
-            alert("Impossible de supprimer : des ventes existent pour cette référence.");
-            return d;
-          }
-          const products = d.products.filter((_, i) => i !== idx);
-          return { ...d, products };
-        });
-      }
+    setData((d) => ({
+      ...d,
+      products: d.products.map((p) =>
+        decrements[p.id] ? { ...p, stock: (p.stock || 0) - decrements[p.id] } : p
+      ),
+      sales: [
+        ...lines.map((l) => ({
+          id: `S-${cryptoRandom()}`,
+          orderId,
+          productId: l.productId,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          total: l.total,
+          ts,
+          client: client || "",
+        })),
+        ...d.sales,
+      ],
+    }));
+  }
 
-      function checkoutOrder({ lines, ts, client }) {
-        const orderId = `O-${Date.now()}`;
-        // décrémente les stocks (somme des quantités par produit)
-        const decrements = lines.reduce((map, l) => {
-          map[l.productId] = (map[l.productId] || 0) + l.qty;
-          return map;
-        }, {});
+  function undoLastSale() {
+    if (data.sales.length === 0) return;
+    const last = data.sales[0];
+    setData((d) => ({
+      ...d,
+      sales: d.sales.slice(1),
+      products: d.products.map((p) =>
+        p.id === last.productId ? { ...p, stock: (p.stock || 0) + last.qty } : p
+      ),
+    }));
+  }
 
-        setData((d) => ({
-          ...d,
-          products: d.products.map((p) =>
-            decrements[p.id] ? { ...p, stock: (p.stock || 0) - decrements[p.id] } : p
-          ),
-          sales: [
-            ...lines.map((l) => ({
-              id: `S-${cryptoRandom()}`,
-              orderId,
-              productId: l.productId,
-              qty: l.qty,
-              unitPrice: l.unitPrice,
-              total: l.total,
-              ts,
-              client: client || "",
-            })),
-            ...d.sales,
-          ],
-        }));
-      }
+  function resetAll() {
+    if (!confirm("Réinitialiser toutes les données ?")) return;
+    setData(defaultData);
+  }
 
-      function undoLastSale() {
-        if (data.sales.length === 0) return;
-        const last = data.sales[0];
-        setData((d) => ({
-          ...d,
-          sales: d.sales.slice(1),
-          products: d.products.map((p) =>
-            p.id === last.productId ? { ...p, stock: (p.stock || 0) + last.qty } : p
-          ),
-        }));
-      }
+  return (
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6">
+      <div className="max-w-6xl mx-auto">
+        <header className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">Mini POS - Stock & Caisse</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTab("stock")}
+              className={`px-4 py-2 rounded-2xl text-sm font-medium border transition ${
+                tab === "stock" ? "bg-white text-black" : "border-white/20 hover:bg-white/10"
+              }`}
+            >STOCK</button>
+            <button
+              onClick={() => setTab("ventes")}
+              className={`px-4 py-2 rounded-2xl text-sm font-medium border transition ${
+                tab === "ventes" ? "bg-white text-black" : "border-white/20 hover:bg-white/10"
+              }`}
+            >CAISSE</button>
+          </div>
+        </header>
 
-      function resetAll() {
-        if (!confirm("Réinitialiser toutes les données ?")) return;
-        setData(defaultData);
-      }
+        {tab === "stock" ? (
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <Kpi label="Références" value={data.products.length} tone="sky" />
+            <Kpi label="Valeur de stock" value={currency(totalStockValue)} tone="indigo" />
+            <Kpi label="Ventes (nb)" value={data.sales.length} tone="slate" />
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <Kpi label="Clients (commandes)" value={dayOrdersCount} tone="emerald" />
+            <Kpi label="Articles vendus" value={dayItems} tone="sky" />
+            <Kpi label={`CA du ${saleDate.split("-").reverse().join("/")}`} value={currency(dayRevenue)} tone="amber" />
+          </div>
+        )}
 
-      return (
-        <div className="min-h-screen p-6">
-          <div className="max-w-6xl mx-auto">
-            <header className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold">Mini POS – Stock & Caisse</h1>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setTab("stock")}
-                  className={`px-4 py-2 rounded-2xl text-sm font-medium border transition ${
-                    tab === "stock" ? "bg-white text-black" : "border-white/20 hover:bg-white/10"
-                  }`}
-                >STOCK</button>
-                <button
-                  onClick={() => setTab("ventes")}
-                  className={`px-4 py-2 rounded-2xl text-sm font-medium border transition ${
-                    tab === "ventes" ? "bg-white text-black" : "border-white/20 hover:bg-white/10"
-                  }`}
-                >CAISSE</button>
-              </div>
-            </header>
+        {tab === "stock" ? (
+          <StockTab
+            products={data.products}
+            onChange={updateProduct}
+            onAdd={addProduct}
+            onRemove={removeProduct}
+          />
+        ) : (
+          <SalesTab
+            products={data.products}
+            onCheckout={checkoutOrder}
+            saleDate={saleDate}
+            setSaleDate={setSaleDate}
+            daySales={daySales}
+            dayRevenue={dayRevenue}
+          />
+        )}
 
-            {tab === "stock" ? (
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <footer className="mt-8 flex flex-wrap gap-3">
+          <button
+            onClick={undoLastSale}
+            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
+          >
+            Annuler la dernière vente
+          </button>
+          <button
+            onClick={resetAll}
+            className="px-4 py-2 rounded-xl border border-red-500/40 text-red-300 hover:bg-red-500/10"
+          >
+            Réinitialiser
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+// ID unique
+function cryptoRandom() {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch (e) {}
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+// ===== Mini auto-tests (non bloquants) =====
+try {
+  console.assert(/^\d{4}-\d{2}-\d{2}$/.test(todayYMD()), "todayYMD au format YYYY-MM-DD");
+  const ts = ymdToTimestamp("2025-08-12");
+  console.assert(tsToYMD(ts) === "2025-08-12", "Conversion YMD <-> TS ok");
+  console.assert(currency(10.5).includes("€"), "currency inclut €");
+  console.assert(suggestId([{id:"REF001"},{id:"REF002"}]).startsWith("REF"), "suggestId renvoie un SKU REFxxx");
+  console.assert(new Set([{orderId:"1"},{orderId:"1"},{orderId:"2"}].map(x=>x.orderId)).size===2, "groupement orderId ok");
+} catch (e) {
+  console.warn("Auto-tests facultatifs non exécutés:", e);
+}
