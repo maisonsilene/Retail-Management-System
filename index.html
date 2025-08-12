@@ -1,394 +1,252 @@
-import React, { useEffect, useMemo, useState } from "react";
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini POS – Stock & Ventes</title>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React + ReactDOM (production) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel pour lire le JSX directement dans le navigateur -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-neutral-950 text-neutral-100">
+  <div id="root"></div>
 
-// Mini POS – Stock & Ventes (2 références pour démarrer)
-// - Aucune base de données : tout est stocké en localStorage
-// - Onglet STOCK : ajuste les stocks de départ, ajoute/édite les 2 refs
-// - Onglet VENTES : enregistre une vente, décrémente le stock, historique
-// - Boutons : Annuler dernière vente, Réinitialiser les données
-//
-// Astuce : pour repartir de zéro, clique sur "Réinitialiser".
+  <script type="text/babel">
+    const { useEffect, useMemo, useState } = React;
 
-const LS_KEY = "mini_pos_data_v1";
-
-const defaultData = {
-  products: [
-    { id: "REF001", name: "Bague acier", price: 16.0, stock: 10 },
-    { id: "REF002", name: "Collier plaqué or", price: 49.0, stock: 5 },
-  ],
-  sales: [], // {id, productId, qty, unitPrice, total, ts}
-};
-
-function loadData() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return defaultData;
-    const parsed = JSON.parse(raw);
-    if (!parsed.products || !Array.isArray(parsed.products)) return defaultData;
-    if (!parsed.sales || !Array.isArray(parsed.sales)) parsed.sales = [];
-    return parsed;
-  } catch (_) {
-    return defaultData;
-  }
-}
-
-function saveData(data) {
-  localStorage.setItem(LS_KEY, JSON.stringify(data));
-}
-
-function currency(n) {
-  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n ?? 0);
-}
-
-export default function App() {
-  const [tab, setTab] = useState("ventes"); // "stock" | "ventes"
-  const [data, setData] = useState(loadData());
-
-  useEffect(() => {
-    saveData(data);
-  }, [data]);
-
-  const totalStockValue = useMemo(() => {
-    return data.products.reduce((acc, p) => acc + (p.stock || 0) * (p.price || 0), 0);
-  }, [data.products]);
-
-  function updateProduct(idx, partial) {
-    setData((d) => {
-      const products = [...d.products];
-      products[idx] = { ...products[idx], ...partial };
-      return { ...d, products };
-    });
-  }
-
-  function addProduct() {
-    const newId = suggestId(data.products);
-    setData((d) => ({
-      ...d,
-      products: [...d.products, { id: newId, name: "Nouvelle réf.", price: 0, stock: 0 }],
-    }));
-  }
-
-  function removeProduct(idx) {
-    setData((d) => {
-      const prod = d.products[idx];
-      const hasSales = d.sales.some((s) => s.productId === prod.id);
-      if (hasSales) {
-        alert("Impossible de supprimer : des ventes existent pour cette référence.");
-        return d;
-      }
-      const products = d.products.filter((_, i) => i !== idx);
-      return { ...d, products };
-    });
-  }
-
-  function recordSale(productId, qty) {
-    const pIdx = data.products.findIndex((p) => p.id === productId);
-    if (pIdx < 0) return;
-
-    const p = data.products[pIdx];
-    const q = Number(qty);
-    if (!q || q <= 0) return alert("Quantité invalide.");
-    if (q > (p.stock || 0)) return alert("Stock insuffisant.");
-
-    const sale = {
-      id: `S-${Date.now()}`,
-      productId: p.id,
-      qty: q,
-      unitPrice: p.price,
-      total: q * (p.price || 0),
-      ts: Date.now(),
+    const LS_KEY = "mini_pos_data_v1";
+    const defaultData = {
+      products: [
+        { id: "REF001", name: "Bague acier", price: 16.0, stock: 10 },
+        { id: "REF002", name: "Collier plaqué or", price: 49.0, stock: 5 },
+      ],
+      sales: [], // {id, productId, qty, unitPrice, total, ts}
     };
 
-    setData((d) => ({
-      ...d,
-      products: d.products.map((x) => (x.id === p.id ? { ...x, stock: (x.stock || 0) - q } : x)),
-      sales: [sale, ...d.sales],
-    }));
-  }
-
-  function undoLastSale() {
-    if (data.sales.length === 0) return;
-    const last = data.sales[0];
-    setData((d) => ({
-      ...d,
-      sales: d.sales.slice(1),
-      products: d.products.map((p) =>
-        p.id === last.productId ? { ...p, stock: (p.stock || 0) + last.qty } : p
-      ),
-    }));
-  }
-
-  function resetAll() {
-    if (!confirm("Réinitialiser toutes les données ?")) return;
-    setData(defaultData);
-  }
-
-  return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6">
-      <div className="max-w-5xl mx-auto">
-        <header className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Mini POS – Stock & Ventes</h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setTab("stock")}
-              className={`px-4 py-2 rounded-2xl text-sm font-medium border transition ${
-                tab === "stock"
-                  ? "bg-white text-black"
-                  : "border-white/20 hover:bg-white/10"
-              }`}
-            >
-              Stock
-            </button>
-            <button
-              onClick={() => setTab("ventes")}
-              className={`px-4 py-2 rounded-2xl text-sm font-medium border transition ${
-                tab === "ventes"
-                  ? "bg-white text-black"
-                  : "border-white/20 hover:bg-white/10"
-              }`}
-            >
-              Ventes
-            </button>
-          </div>
-        </header>
-
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
-          <Kpi label="Références" value={data.products.length} />
-          <Kpi label="Valeur de stock" value={currency(totalStockValue)} />
-          <Kpi label="Ventes (nb)" value={data.sales.length} />
-        </div>
-
-        {tab === "stock" ? (
-          <StockTab
-            products={data.products}
-            onChange={updateProduct}
-            onAdd={addProduct}
-            onRemove={removeProduct}
-          />
-        ) : (
-          <SalesTab products={data.products} sales={data.sales} onSale={recordSale} />
-        )}
-
-        <footer className="mt-8 flex flex-wrap gap-3">
-          <button
-            onClick={undoLastSale}
-            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
-          >
-            Annuler la dernière vente
-          </button>
-          <button
-            onClick={resetAll}
-            className="px-4 py-2 rounded-xl border border-red-500/40 text-red-300 hover:bg-red-500/10"
-          >
-            Réinitialiser
-          </button>
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-function Kpi({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="text-sm text-neutral-300">{label}</div>
-      <div className="text-xl font-semibold">{value}</div>
-    </div>
-  );
-}
-
-function StockTab({ products, onChange, onAdd, onRemove }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Stock de départ</h2>
-        <button onClick={onAdd} className="px-3 py-2 rounded-xl border border-white/20 hover:bg-white/10 text-sm">
-          + Ajouter une référence
-        </button>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="text-neutral-300">
-            <tr>
-              <th className="py-2 pr-4">SKU</th>
-              <th className="py-2 pr-4">Nom</th>
-              <th className="py-2 pr-4">Prix TTC</th>
-              <th className="py-2 pr-4">Stock</th>
-              <th className="py-2 pr-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p, idx) => (
-              <tr key={p.id} className="border-t border-white/10">
-                <td className="py-2 pr-4 align-middle">
-                  <input
-                    value={p.id}
-                    onChange={(e) => onChange(idx, { id: e.target.value })}
-                    className="w-28 bg-transparent border border-white/10 rounded-lg px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-4 align-middle">
-                  <input
-                    value={p.name}
-                    onChange={(e) => onChange(idx, { name: e.target.value })}
-                    className="min-w-56 bg-transparent border border-white/10 rounded-lg px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-4 align-middle">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={p.price}
-                    onChange={(e) => onChange(idx, { price: parseFloat(e.target.value || "0") })}
-                    className="w-28 bg-transparent border border-white/10 rounded-lg px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-4 align-middle">
-                  <input
-                    type="number"
-                    value={p.stock}
-                    onChange={(e) => onChange(idx, { stock: parseInt(e.target.value || "0", 10) })}
-                    className="w-24 bg-transparent border border-white/10 rounded-lg px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-4 text-right align-middle">
-                  <button
-                    onClick={() => onRemove(idx)}
-                    className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs"
-                  >
-                    Supprimer
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function SalesTab({ products, sales, onSale }) {
-  const [productId, setProductId] = useState(products[0]?.id || "");
-  const [qty, setQty] = useState(1);
-
-  useEffect(() => {
-    // Si la liste de produits change et que l'id n'existe plus
-    if (!products.find((p) => p.id === productId) && products.length > 0) {
-      setProductId(products[0].id);
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return defaultData;
+        const parsed = JSON.parse(raw);
+        if (!parsed.products || !Array.isArray(parsed.products)) return defaultData;
+        if (!parsed.sales || !Array.isArray(parsed.sales)) parsed.sales = [];
+        return parsed;
+      } catch {
+        return defaultData;
+      }
     }
-  }, [products, productId]);
+    function saveData(data) { localStorage.setItem(LS_KEY, JSON.stringify(data)); }
+    function currency(n) {
+      return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n ?? 0);
+    }
+    function suggestId(products) {
+      const base = products.map((p) => p.id);
+      for (let n = 1; n < 999; n++) {
+        const ref = `REF${String(n).padStart(3, "0")}`;
+        if (!base.includes(ref)) return ref;
+      }
+      return `REF${Date.now()}`;
+    }
 
-  const selected = products.find((p) => p.id === productId);
-
-  return (
-    <div className="grid md:grid-cols-2 gap-4">
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <h2 className="text-lg font-semibold mb-4">Nouvelle vente</h2>
-
-        <div className="space-y-3">
-          <div>
-            <label className="text-sm text-neutral-300">Référence</label>
-            <select
-              className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id} className="bg-neutral-900">
-                  {p.id} — {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3 items-end">
-            <div>
-              <label className="text-sm text-neutral-300">Quantité</label>
-              <input
-                type="number"
-                className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
-                value={qty}
-                min={1}
-                onChange={(e) => setQty(parseInt(e.target.value || "1", 10))}
-              />
-            </div>
-            <div>
-              <div className="text-sm text-neutral-300">Stock dispo</div>
-              <div className="text-xl font-semibold">
-                {selected ? selected.stock : 0}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-sm pt-2">
-            <div className="text-neutral-300">Prix unitaire</div>
-            <div className="font-medium">{currency(selected?.price || 0)}</div>
-          </div>
-          <div className="flex items-center justify-between text-base">
-            <div className="text-neutral-300">Total</div>
-            <div className="text-lg font-semibold">{currency((selected?.price || 0) * (qty || 0))}</div>
-          </div>
-
-          <button
-            onClick={() => onSale(productId, qty)}
-            className="w-full mt-2 px-4 py-3 rounded-xl border border-emerald-400/40 text-emerald-200 hover:bg-emerald-500/10 font-medium"
-          >
-            Enregistrer la vente
-          </button>
+    function Kpi({ label, value }) {
+      return (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-sm text-neutral-300">{label}</div>
+          <div className="text-xl font-semibold">{value}</div>
         </div>
-      </div>
+      );
+    }
 
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <h2 className="text-lg font-semibold mb-4">Historique des ventes</h2>
-        {sales.length === 0 ? (
-          <div className="text-neutral-400 text-sm">Aucune vente pour l'instant.</div>
-        ) : (
+    function StockTab({ products, onChange, onAdd, onRemove }) {
+      return (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Stock de départ</h2>
+            <button onClick={onAdd} className="px-3 py-2 rounded-xl border border-white/20 hover:bg-white/10 text-sm">
+              + Ajouter une référence
+            </button>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="text-neutral-300">
                 <tr>
-                  <th className="py-2 pr-4">Heure</th>
-                  <th className="py-2 pr-4">Réf.</th>
-                  <th className="py-2 pr-4">Qté</th>
-                  <th className="py-2 pr-4">PU</th>
-                  <th className="py-2 pr-4">Total</th>
+                  <th className="py-2 pr-4">SKU</th>
+                  <th className="py-2 pr-4">Nom</th>
+                  <th className="py-2 pr-4">Prix TTC</th>
+                  <th className="py-2 pr-4">Stock</th>
+                  <th className="py-2 pr-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {sales.map((s) => {
-                  const p = products.find((x) => x.id === s.productId);
-                  return (
-                    <tr key={s.id} className="border-t border-white/10">
-                      <td className="py-2 pr-4">
-                        {new Date(s.ts).toLocaleString("fr-FR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          day: "2-digit",
-                          month: "2-digit",
-                        })}
-                      </td>
-                      <td className="py-2 pr-4">{s.productId} — {p?.name || "?"}</td>
-                      <td className="py-2 pr-4">{s.qty}</td>
-                      <td className="py-2 pr-4">{currency(s.unitPrice)}</td>
-                      <td className="py-2 pr-4 font-medium">{currency(s.total)}</td>
-                    </tr>
-                  );
-                })}
+                {products.map((p, idx) => (
+                  <tr key={p.id} className="border-t border-white/10">
+                    <td className="py-2 pr-4 align-middle">
+                      <input
+                        value={p.id}
+                        onChange={(e) => onChange(idx, { id: e.target.value })}
+                        className="w-28 bg-transparent border border-white/10 rounded-lg px-2 py-1"
+                      />
+                    </td>
+                    <td className="py-2 pr-4 align-middle">
+                      <input
+                        value={p.name}
+                        onChange={(e) => onChange(idx, { name: e.target.value })}
+                        className="min-w-56 bg-transparent border border-white/10 rounded-lg px-2 py-1"
+                      />
+                    </td>
+                    <td className="py-2 pr-4 align-middle">
+                      <input
+                        type="number" step="0.01"
+                        value={p.price}
+                        onChange={(e) => onChange(idx, { price: parseFloat(e.target.value || "0") })}
+                        className="w-28 bg-transparent border border-white/10 rounded-lg px-2 py-1"
+                      />
+                    </td>
+                    <td className="py-2 pr-4 align-middle">
+                      <input
+                        type="number"
+                        value={p.stock}
+                        onChange={(e) => onChange(idx, { stock: parseInt(e.target.value || "0", 10) })}
+                        className="w-24 bg-transparent border border-white/10 rounded-lg px-2 py-1"
+                      />
+                    </td>
+                    <td className="py-2 pr-4 text-right align-middle">
+                      <button
+                        onClick={() => onRemove(idx)}
+                        className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs"
+                      >
+                        Supprimer
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
+        </div>
+      );
+    }
 
-function suggestId(products) {
-  // Cherche REF00X/ART00X suivant
-  const base = products.map((p) => p.id);
-  for (let n = 1; n < 999; n++) {
-    const ref = `REF${String(n).padStart(3, "0")}`;
-    if (!base.includes(ref)) return ref;
-  }
-  return `REF${Date.now()}`;
-}
+    function SalesTab({ products, sales, onSale }) {
+      const [productId, setProductId] = useState(products[0]?.id || "");
+      const [qty, setQty] = useState(1);
+
+      useEffect(() => {
+        if (!products.find((p) => p.id === productId) && products.length > 0) {
+          setProductId(products[0].id);
+        }
+      }, [products, productId]);
+
+      const selected = products.find((p) => p.id === productId);
+
+      return (
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <h2 className="text-lg font-semibold mb-4">Nouvelle vente</h2>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-neutral-300">Référence</label>
+                <select
+                  className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
+                  value={productId}
+                  onChange={(e) => setProductId(e.target.value)}
+                >
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id} className="bg-neutral-900">
+                      {p.id} — {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="text-sm text-neutral-300">Quantité</label>
+                  <input
+                    type="number" min="1"
+                    className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1"
+                    value={qty}
+                    onChange={(e) => setQty(parseInt(e.target.value || "1", 10))}
+                  />
+                </div>
+                <div>
+                  <div className="text-sm text-neutral-300">Stock dispo</div>
+                  <div className="text-xl font-semibold">
+                    {selected ? selected.stock : 0}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm pt-2">
+                <div className="text-neutral-300">Prix unitaire</div>
+                <div className="font-medium">{currency(selected?.price || 0)}</div>
+              </div>
+              <div className="flex items-center justify-between text-base">
+                <div className="text-neutral-300">Total</div>
+                <div className="text-lg font-semibold">{currency((selected?.price || 0) * (qty || 0))}</div>
+              </div>
+
+              <button
+                onClick={() => onSale(productId, qty)}
+                className="w-full mt-2 px-4 py-3 rounded-xl border border-emerald-400/40 text-emerald-200 hover:bg-emerald-500/10 font-medium"
+              >
+                Enregistrer la vente
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <h2 className="text-lg font-semibold mb-4">Historique des ventes</h2>
+            {sales.length === 0 ? (
+              <div className="text-neutral-400 text-sm">Aucune vente pour l'instant.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-neutral-300">
+                    <tr>
+                      <th className="py-2 pr-4">Heure</th>
+                      <th className="py-2 pr-4">Réf.</th>
+                      <th className="py-2 pr-4">Qté</th>
+                      <th className="py-2 pr-4">PU</th>
+                      <th className="py-2 pr-4">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sales.map((s) => {
+                      const p = products.find((x) => x.id === s.productId);
+                      return (
+                        <tr key={s.id} className="border-t border-white/10">
+                          <td className="py-2 pr-4">
+                            {new Date(s.ts).toLocaleString("fr-FR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}
+                          </td>
+                          <td className="py-2 pr-4">{s.productId} — {p?.name || "?"}</td>
+                          <td className="py-2 pr-4">{s.qty}</td>
+                          <td className="py-2 pr-4">{currency(s.unitPrice)}</td>
+                          <td className="py-2 pr-4 font-medium">{currency(s.total)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [tab, setTab] = useState("ventes"); // "stock" | "ventes"
+      const [data, setData] = useState(loadData());
+
+      useEffect(() => { saveD
