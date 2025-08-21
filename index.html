@@ -1,339 +1,63 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mini POS – Stock & Caisse</title>
-
-  <!-- Tailwind (CDN) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Petit overlay d'erreurs AVANT tout le reste -->
-  <script>
-    (function () {
-      function show(msg) {
-        var p = document.createElement('pre');
-        p.style.cssText = 'position:fixed;inset:0;z-index:99999;padding:16px;margin:0;white-space:pre-wrap;' +
-                          'background:rgba(220,38,38,.95);color:#fff;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px';
-        p.textContent = 'Erreur JS :\\n\\n' + msg;
-        document.body.appendChild(p);
-      }
-      window.addEventListener('error', function(e){ show((e.error && e.error.stack) || e.message); });
-      window.addEventListener('unhandledrejection', function(e){ show('Promise rejetée : ' + (e.reason && (e.reason.stack||e.reason) || e)); });
-      window.addEventListener('load', function(){
-        // Si les CDN React ne chargent pas (réseau/adblock), on le signale
-        setTimeout(function(){
-          if (!window.React || !window.ReactDOM) {
-            show('Impossible de charger React/ReactDOM depuis le CDN.\\n' +
-                 'Vérifie la connexion et les bloqueurs de contenu.');
-          }
-        }, 500);
-      });
-    })();
-  </script>
-
-  <!-- React 18 (CDN) -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-  <!-- Babel pour interpréter le JSX -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test Supabase — Produits actifs</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto;max-width:800px;margin:40px auto;padding:0 16px}
+  h1{margin:0 0 12px} .muted{color:#666}
+  ul{list-style:none;padding:0} li{padding:10px 12px;border:1px solid #ddd;border-radius:10px;margin:8px 0}
+  .row{display:flex;justify-content:space-between;gap:12px;align-items:center}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-neutral-950 text-neutral-100">
-  <!-- Fallback visible si JS ne part pas -->
-  <div id="root">Chargement…</div>
+<body>
+  <h1>Produits actifs</h1>
+  <p class="muted">Lecture en direct depuis Supabase (RLS: <code>actif = true</code>).</p>
 
-  <!-- IMPORTANT : preset "env" pour compat mobile + "react" pour JSX -->
-  <script type="text/babel" data-presets="env,react">
-    const { useEffect, useMemo, useState } = React;
+  <div id="status" class="muted">Chargement…</div>
+  <ul id="list"></ul>
 
-    /* ======== Données / helpers ======== */
-    const LS_KEY = "mini_pos_data_v2";
-    const defaultData = {
-      products: [
-        { id: "REF001", name: "Bague acier", price: 16.0, stock: 10 },
-        { id: "REF002", name: "Collier plaqué or", price: 49.0, stock: 5 },
-      ],
-      sales: [],
-    };
+<script>
+const SUPABASE_URL = "https://TON-PROJET.supabase.co";      // ← remplace
+const SUPABASE_ANON_KEY = "TA_ANON_KEY";                    // ← remplace
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    function loadData(){ try{ const raw=localStorage.getItem(LS_KEY); if(!raw) return defaultData;
-      const p=JSON.parse(raw); if(!Array.isArray(p.products)) p.products=[]; if(!Array.isArray(p.sales)) p.sales=[]; return p; }catch{return defaultData;} }
-    function saveData(d){ localStorage.setItem(LS_KEY, JSON.stringify(d)); }
-    function currency(n){ return new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n??0); }
-    function suggestId(products){ const base=products.map(p=>p.id); for(let i=1;i<999;i++){ const ref=`REF${String(i).padStart(3,"0")}`; if(!base.includes(ref)) return ref; } return `REF${Date.now()}`; }
-    function todayYMD(){ return new Date().toISOString().slice(0,10); }
-    function ymdToTimestamp(ymd){ const [y,m,d]=ymd.split("-").map(Number); return new Date(y,m-1,d,12,0,0).getTime(); }
-    function tsToYMD(ts){ const d=new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+async function loadProduits(){
+  const status = document.getElementById('status');
+  const list = document.getElementById('list');
+  status.textContent = "Chargement…";
+  list.innerHTML = "";
 
-    /* ======== UI ======== */
-    function Kpi({ label, value, tone="neutral" }) {
-      const tones = {
-        neutral:{border:"border-white/10",bg:"bg-white/5",chip:"bg-white/20"},
-        emerald:{border:"border-emerald-400/40",bg:"bg-emerald-500/5",chip:"bg-emerald-400/30"},
-        amber:{border:"border-amber-400/40",bg:"bg-amber-500/5",chip:"bg-amber-400/30"},
-        sky:{border:"border-sky-400/40",bg:"bg-sky-500/5",chip:"bg-sky-400/30"},
-        indigo:{border:"border-indigo-400/40",bg:"bg-indigo-500/5",chip:"bg-indigo-400/30"},
-        slate:{border:"border-slate-400/40",bg:"bg-slate-500/5",chip:"bg-slate-400/30"},
-      };
-      const t = tones[tone] || tones.neutral;
-      return (
-        <div className={`rounded-2xl ${t.border} ${t.bg} p-4`}>
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-neutral-300">{label}</div>
-            <span className={`inline-block w-2 h-2 rounded-full ${t.chip}`}></span>
-          </div>
-          <div className="text-xl font-semibold mt-1">{value}</div>
-        </div>
-      );
-    }
+  const { data, error } = await sb
+    .from('produits')
+    .select('id, nom, prix_ttc, stock, actif')
+    .order('created_at', { ascending: false });
 
-    function StockTab({ products, onChange, onAdd, onRemove }) {
-      return (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Stock de départ</h2>
-            <button onClick={onAdd} className="px-3 py-2 rounded-xl border border-white/20 hover:bg-white/10 text-sm">+ Ajouter une référence</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-neutral-300">
-                <tr><th className="py-2 pr-4">SKU</th><th className="py-2 pr-4">Nom</th><th className="py-2 pr-4">Prix TTC</th><th className="py-2 pr-4">Stock</th><th className="py-2 pr-4 text-right">Actions</th></tr>
-              </thead>
-              <tbody>
-                {products.map((p, idx) => (
-                  <tr key={p.id} className="border-t border-white/10">
-                    <td className="py-2 pr-4"><input value={p.id} onChange={e=>onChange(idx,{id:e.target.value})} className="w-28 bg-transparent border border-white/10 rounded-lg px-2 py-1" /></td>
-                    <td className="py-2 pr-4"><input value={p.name} onChange={e=>onChange(idx,{name:e.target.value})} className="min-w-56 bg-transparent border border-white/10 rounded-lg px-2 py-1" /></td>
-                    <td className="py-2 pr-4"><input type="number" step="0.01" inputMode="decimal" value={p.price} onChange={e=>onChange(idx,{price:parseFloat((e.target.value||"0").replace(",", "."))})} className="w-28 bg-transparent border border-white/10 rounded-lg px-2 py-1" /></td>
-                    <td className="py-2 pr-4"><input type="number" inputMode="numeric" value={p.stock} onChange={e=>onChange(idx,{stock:parseInt(e.target.value||"0",10)})} className="w-24 bg-transparent border border-white/10 rounded-lg px-2 py-1" /></td>
-                    <td className="py-2 pr-4 text-right"><button onClick={()=>onRemove(idx)} className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs">Supprimer</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      );
-    }
+  if(error){
+    status.textContent = "Erreur : " + error.message;
+    return;
+  }
+  if(!data || !data.length){
+    status.textContent = "Aucun produit actif.";
+    return;
+  }
+  status.textContent = `OK, ${data.length} produit(s) actif(s)`;
+  data.forEach(p=>{
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <div class="row">
+        <strong>${p.nom}</strong>
+        <span>${(p.prix_ttc??0).toFixed ? p.prix_ttc.toFixed(2) : p.prix_ttc} €</span>
+      </div>
+      <div class="muted">Stock: ${p.stock ?? 0} • actif: ${p.actif ? "oui" : "non"}</div>
+    `;
+    list.appendChild(li);
+  });
+}
 
-    function SalesTab({ products, onCheckout, saleDate, setSaleDate, daySales, dayRevenue }) {
-      const [client, setClient] = useState("");
-      const [productId, setProductId] = useState(products[0]?.id || "");
-      const [qty, setQty] = useState(1);
-      const [cart, setCart] = useState([]);
-      const [feedback, setFeedback] = useState("");
-
-      useEffect(() => { if (!products.find(p=>p.id===productId) && products.length>0) setProductId(products[0].id); }, [products, productId]);
-
-      const selected = products.find(p=>p.id===productId);
-      const cartDetailed = cart.map(line => {
-        const p = products.find(x=>x.id===line.productId);
-        const unit = (p && p.price) || 0;
-        return { ...line, name: (p && p.name) || line.productId, unitPrice: unit, total: unit*line.qty, stock: (p && p.stock) || 0 };
-      });
-      const cartTotal = cartDetailed.reduce((a,l)=>a+l.total,0);
-
-      function addToCart(){
-        const q = Number(qty);
-        if (!selected) return;
-        if (!q || q<=0) { setFeedback("Quantité invalide."); return; }
-        setFeedback("");
-        setCart(c=>{
-          const i = c.findIndex(l=>l.productId===selected.id);
-          if (i>=0){ const clone=[...c]; clone[i]={...clone[i], qty:clone[i].qty+q}; return clone; }
-          return [...c, { productId:selected.id, qty:q }];
-        });
-      }
-      function removeFromCart(i){ setCart(c=>c.filter((_,x)=>x!==i)); }
-      function clearCart(){ setCart([]); }
-      function checkout(){
-        if (cart.length===0){ setFeedback("Panier vide. Ajoute au moins un article."); return; }
-        for (const l of cartDetailed){ if (l.qty > l.stock){ setFeedback(`Stock insuffisant pour ${l.name} (dispo ${l.stock}).`); return; } }
-        const ts = ymdToTimestamp(saleDate);
-        onCheckout({ lines: cartDetailed, ts, client });
-        clearCart(); setQty(1); setFeedback("✅ Vente enregistrée.");
-      }
-
-      const dayItems = React.useMemo(()=>daySales.reduce((a,s)=>a+(s.qty||0),0),[daySales]);
-      const dayOrdersCount = React.useMemo(()=>new Set(daySales.map(s=>s.orderId)).size,[daySales]);
-
-      return (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-lg font-semibold">Caisse — Nouvelle vente</h2>
-                <div className="text-xs text-neutral-400">Choisis une date, ajoute plusieurs articles puis encaisse.</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-neutral-300">Date</label>
-                <input type="date" value={saleDate} onChange={e=>setSaleDate(e.target.value)} className="bg-transparent border border-white/10 rounded-lg px-2 py-1" />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {feedback && <div className="text-sm border border-white/15 bg-white/5 rounded-lg px-3 py-2">{feedback}</div>}
-
-              <div>
-                <label className="text-sm text-neutral-300">Client (optionnel)</label>
-                <input value={client} onChange={e=>setClient(e.target.value)} placeholder="Nom / info ticket" className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1" />
-              </div>
-
-              <div>
-                <label className="text-sm text-neutral-300">Référence</label>
-                <select className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1" value={productId} onChange={e=>setProductId(e.target.value)}>
-                  {products.map(p=>(<option key={p.id} value={p.id} className="bg-neutral-900">{p.id} — {p.name}</option>))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 items-end">
-                <div>
-                  <label className="text-sm text-neutral-300">Quantité</label>
-                  <input type="number" min="1" inputMode="numeric" className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-2 mt-1" value={qty} onChange={e=>setQty(parseInt(e.target.value||"1",10))} />
-                </div>
-                <div>
-                  <div className="text-sm text-neutral-300">Stock dispo</div>
-                  <div className="text-xl font-semibold">{selected ? selected.stock : 0}</div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-sm pt-2">
-                <div className="text-neutral-300">Prix unitaire</div>
-                <div className="font-medium">{currency((selected && selected.price) || 0)}</div>
-              </div>
-              <div className="flex items-center justify-between text-base">
-                <div className="text-neutral-300">Sous-total</div>
-                <div className="text-lg font-semibold">{currency(((selected && selected.price) || 0) * (qty || 0))}</div>
-              </div>
-
-              <div className="flex gap-2">
-                <button onClick={addToCart} className="flex-1 px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10 font-medium">Ajouter au panier</button>
-                <button onClick={clearCart} className="px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10">Vider</button>
-              </div>
-
-              <div className="mt-4">
-                <div className="text-sm text-neutral-300 mb-2">Panier</div>
-                {cartDetailed.length===0 ? (
-                  <div className="text-neutral-400 text-sm">Aucun article.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="text-neutral-300">
-                        <tr><th className="py-2 pr-4">Réf.</th><th className="py-2 pr-4">Nom</th><th className="py-2 pr-4">Qté</th><th className="py-2 pr-4">PU</th><th className="py-2 pr-4">Total</th><th className="py-2 pr-4 text-right">Actions</th></tr>
-                      </thead>
-                      <tbody>
-                        {cartDetailed.map((l,i)=>(
-                          <tr key={i} className="border-t border-white/10">
-                            <td className="py-2 pr-4">{l.productId}</td><td className="py-2 pr-4">{l.name}</td><td className="py-2 pr-4">{l.qty}</td>
-                            <td className="py-2 pr-4">{currency(l.unitPrice)}</td><td className="py-2 pr-4">{currency(l.total)}</td>
-                            <td className="py-2 pr-4 text-right"><button onClick={()=>removeFromCart(i)} className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs">Supprimer</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr><td colSpan="4" className="py-2 pr-4 text-right font-medium">Total panier</td><td className="py-2 pr-4 font-semibold">{currency(cartTotal)}</td><td></td></tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              <button onClick={checkout} disabled={cart.length===0}
-                className="w-full mt-3 px-4 py-3 rounded-xl font-semibold bg-emerald-500 text-black hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 transition disabled:bg-emerald-500/20 disabled:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-60">
-                Encaisser
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Commandes du jour</h2>
-              <div className="text-sm">CA du {saleDate.split("-").reverse().join("/")}: <span className="font-semibold">{currency(dayRevenue)}</span></div>
-            </div>
-            {daySales.length===0 ? (
-              <div className="text-neutral-400 text-sm">Aucune vente pour cette date.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-neutral-300">
-                    <tr><th className="py-2 pr-4">Heure</th><th className="py-2 pr-4">Commande</th><th className="py-2 pr-4">Client</th><th className="py-2 pr-4">Réf.</th><th className="py-2 pr-4">Qté</th><th className="py-2 pr-4">PU</th><th className="py-2 pr-4">Total</th></tr>
-                  </thead>
-                  <tbody>
-                    {daySales.map(s=>(
-                      <tr key={s.id} className="border-t border-white/10">
-                        <td className="py-2 pr-4">{new Date(s.ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</td>
-                        <td className="py-2 pr-4">{s.orderId}</td>
-                        <td className="py-2 pr-4">{s.client || "—"}</td>
-                        <td className="py-2 pr-4">{s.productId}</td>
-                        <td className="py-2 pr-4">{s.qty}</td>
-                        <td className="py-2 pr-4">{currency(s.unitPrice)}</td>
-                        <td className="py-2 pr-4 font-medium">{currency(s.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    function App(){
-      const [tab, setTab] = useState("ventes");
-      const [data, setData] = useState(loadData());
-      const [saleDate, setSaleDate] = useState(todayYMD());
-
-      useEffect(()=>{ saveData(data); }, [data]);
-
-      const totalStockValue = useMemo(()=>data.products.reduce((a,p)=>a+(p.stock||0)*(p.price||0),0),[data.products]);
-      const daySales = useMemo(()=>data.sales.filter(s=>tsToYMD(s.ts)===saleDate),[data.sales, saleDate]);
-      const dayRevenue = useMemo(()=>daySales.reduce((a,s)=>a+s.total,0),[daySales]);
-
-      function updateProduct(idx, partial){
-        setData(d=>{ const products=[...d.products]; products[idx]={...products[idx], ...partial}; return {...d, products}; });
-      }
-      function addProduct(){ const newId=suggestId(data.products); setData(d=>({...d, products:[...d.products,{id:newId,name:"Nouvelle réf.",price:0,stock:0}]})); }
-      function removeProduct(idx){
-        setData(d=>{ const prod=d.products[idx];
-          if (d.sales.some(s=>s.productId===prod.id)){ alert("Impossible de supprimer : des ventes existent pour cette référence."); return d; }
-          return {...d, products:d.products.filter((_,i)=>i!==idx)};
-        });
-      }
-      function checkoutOrder({ lines, ts, client }){
-        const orderId = `O-${Date.now()}`;
-        const dec = lines.reduce((m,l)=>{ m[l.productId]=(m[l.productId]||0)+l.qty; return m; },{});
-        setData(d=>({
-          ...d,
-          products: d.products.map(p=>dec[p.id]?{...p, stock:(p.stock||0)-dec[p.id]}:p),
-          sales: [...lines.map(l=>({ id:`S-${Math.random().toString(36).slice(2)+Date.now().toString(36)}`, orderId, productId:l.productId, qty:l.qty, unitPrice:l.unitPrice, total:l.total, ts, client:client||"" })), ...d.sales],
-        }));
-      }
-      function undoLastSale(){ if (data.sales.length===0) return; const last=data.sales[0];
-        setData(d=>({ ...d, sales:d.sales.slice(1), products:d.products.map(p=>p.id===last.productId?{...p, stock:(p.stock||0)+last.qty}:p) })); }
-      function resetAll(){ if (!confirm("Réinitialiser toutes les données ?")) return; setData(defaultData); }
-
-      return (
-        <div className="min-h-screen p-6">
-          <div className="max-w-6xl mx-auto">
-            <header className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold">Mini POS – Stock & Caisse</h1>
-              <div className="flex items-center gap-2">
-                <button onClick={()=>setTab("stock")} className={`px-4 py-2 rounded-2xl text-sm font-medium border transition ${tab==="stock"?"bg-white text-black":"border-white/20 hover:bg-white/10"}`}>STOCK</button>
-                <button onClick={()=>setTab("ventes")} className={`px-4 py-2 rounded-2xl text-sm font-medium border transition ${tab==="ventes"?"bg-white text-black":"border-white/20 hover:bg-white/10"}`}>CAISSE</button>
-              </div>
-            </header>
-
-            {tab==="stock" ? (
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
-                <Kpi label="Références" value={data.products.length} tone="sky" />
-                <Kpi label="Valeur de stock" value={currency(totalStockValue)} tone="indigo" />
-                <Kpi label="Ventes (nb)" value={data.sales.length} tone="slate" />
-              </div>
-            ) : (
-              <CaisseKpis saleDate={saleDate} daySales={daySales} />
-            )}
-
-            {tab==="stock" ? (
-              <StockTab products={data.products} onChange={updateProduct} onAdd={addProduct} onRemove={removeProduct} />
+loadProduits();
+</script>
+</body>
+</html>
