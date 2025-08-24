@@ -1,7 +1,6 @@
 /**
- * FICHIER: src/config.js
- * OBJET: Clés et constantes (URL + anon key).
- * NOTE: 'anon' = clé publique limitée par RLS.
+ * Boîte à clés Supabase (URL + anon key)
+ * NOTE: clé anon publique (OK côté front). Ne jamais mettre service_role ici.
  */
 export const CFG = {
   SUPABASE_URL: "https://eiewigilwczsciraepnb.supabase.co",
