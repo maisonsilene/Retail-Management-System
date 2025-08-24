@@ -1,6 +1,6 @@
 <!--
 FICHIER: index.html
-OBJET: Mini POS (test connexion + lecture produits existants).
+OBJET: Mini POS (connexion + liste + ajout sur la table 'produits').
 DÉPENDANCES: supabase-js (CDN), ./src/config.js, ./src/supabaseClient.js, ./src/app.js
 -->
 <!doctype html>
@@ -8,18 +8,18 @@ DÉPENDANCES: supabase-js (CDN), ./src/config.js, ./src/supabaseClient.js, ./src
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mini POS — Test connexion</title>
+  <title>Mini POS — Produits</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <style>
     body { background:#0b0f14; color:#e5e7eb }
     .card { background:#111827; border-radius:12px; padding:16px; border:1px solid #1f2937 }
-    .ok { color:#22c55e } .ko { color:#ef4444 } .muted { color:#9ca3af }
-    pre { background:#0b1220; padding:12px; border-radius:8px; overflow:auto; border:1px solid #1f2937 }
+    .muted { color:#9ca3af }
+    .ok { color:#22c55e } .ko { color:#ef4444 }
   </style>
 </head>
 <body class="container">
   <main>
-    <h1>Mini POS — Test connexion Supabase</h1>
+    <h1>Mini POS — Gestion Produits</h1>
 
     <section class="card">
       <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;">
@@ -33,16 +33,42 @@ DÉPENDANCES: supabase-js (CDN), ./src/config.js, ./src/supabaseClient.js, ./src
     </section>
 
     <section class="card">
-      <h3>Produits existants (top 5)</h3>
-      <ul id="productsList" style="margin:0;"></ul>
-      <details style="margin-top:10px;">
-        <summary>Voir JSON (debug)</summary>
-        <pre id="rawJson">[]</pre>
-      </details>
+      <h3>Produits</h3>
+      <p class="muted"><strong id="count">—</strong> produit(s)</p>
+      <ul id="productsList" class="muted" style="margin:0;"></ul>
+    </section>
+
+    <section class="card">
+      <h3>Ajouter un produit</h3>
+      <form id="addForm">
+        <div class="grid">
+          <label>Nom
+            <input id="nom" type="text" placeholder="Bague acier…" required />
+          </label>
+          <label>Prix TTC (€)
+            <input id="prix_ttc" type="number" min="0" step="0.01" value="0" required />
+          </label>
+        </div>
+        <div class="grid">
+          <label>Stock (initial)
+            <input id="stock" type="number" step="1" value="0" />
+          </label>
+          <label>Actif ?
+            <select id="actif">
+              <option value="true" selected>Oui</option>
+              <option value="false">Non</option>
+            </select>
+          </label>
+        </div>
+        <button id="addBtn" type="submit">Ajouter</button>
+      </form>
     </section>
   </main>
 
+  <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Nos scripts (ordre important) -->
   <script type="module" src="./src/config.js"></script>
   <script type="module" src="./src/supabaseClient.js"></script>
   <script type="module" src="./src/app.js"></script>
