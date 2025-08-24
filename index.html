@@ -1,76 +1,141 @@
-<!--
-FICHIER: index.html
-OBJET: Mini POS (connexion + liste + ajout sur la table 'produits').
-DÉPENDANCES: supabase-js (CDN), ./src/config.js, ./src/supabaseClient.js, ./src/app.js
--->
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mini POS — Produits</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini POS — Test Produits</title>
   <style>
-    body { background:#0b0f14; color:#e5e7eb }
-    .card { background:#111827; border-radius:12px; padding:16px; border:1px solid #1f2937 }
-    .muted { color:#9ca3af }
-    .ok { color:#22c55e } .ko { color:#ef4444 }
+    body {
+      background: #0d1117;
+      color: white;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h1 { text-align: center; }
+    .card {
+      background: #161b22;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+    }
+    input, select {
+      padding: 6px;
+      margin: 4px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #0d1117;
+      color: white;
+    }
+    button {
+      padding: 8px 12px;
+      margin-top: 6px;
+      background: green;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background: darkgreen; }
+    .muted { color: #9ca3af }
   </style>
 </head>
-<body class="container">
-  <main>
-    <h1>Mini POS — Gestion Produits</h1>
+<body>
 
-    <section class="card">
-      <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;">
-        <div>
-          <strong>État connexion :</strong>
-          <span id="connState" class="muted">…</span>
-        </div>
-        <button id="refreshBtn">Rafraîchir</button>
-      </div>
-      <small id="status" class="muted"></small>
-    </section>
+  <h1>Mini POS — Test Produits</h1>
 
-    <section class="card">
-      <h3>Produits</h3>
-      <p class="muted"><strong id="count">—</strong> produit(s)</p>
-      <ul id="productsList" class="muted" style="margin:0;"></ul>
-    </section>
+  <!-- Statistiques -->
+  <div class="card">
+    <div>Produits actifs : <span id="nbProduits">--</span></div>
+    <div>Stock total : <span id="stockTotal">--</span></div>
+  </div>
 
-    <section class="card">
-      <h3>Ajouter un produit</h3>
-      <form id="addForm">
-        <div class="grid">
-          <label>Nom
-            <input id="nom" type="text" placeholder="Bague acier…" required />
-          </label>
-          <label>Prix TTC (€)
-            <input id="prix_ttc" type="number" min="0" step="0.01" value="0" required />
-          </label>
-        </div>
-        <div class="grid">
-          <label>Stock (initial)
-            <input id="stock" type="number" step="1" value="0" />
-          </label>
-          <label>Actif ?
-            <select id="actif">
-              <option value="true" selected>Oui</option>
-              <option value="false">Non</option>
-            </select>
-          </label>
-        </div>
-        <button id="addBtn" type="submit">Ajouter</button>
-      </form>
-    </section>
-  </main>
+  <!-- Liste produits -->
+  <div class="card">
+    <h2>Produits</h2>
+    <button onclick="loadProduits()">Rafraîchir</button>
+    <ul id="listeProduits"></ul>
+    <p id="status" class="muted"></p>
+  </div>
 
-  <!-- Supabase CDN -->
+  <!-- Formulaire -->
+  <div class="card">
+    <h2>Ajouter un produit</h2>
+    <input type="text" id="nom" placeholder="Nom du produit" />
+    <input type="number" id="prix" placeholder="Prix TTC (€)" />
+    <input type="number" id="stock" placeholder="Stock initial" />
+    <select id="actif">
+      <option value="true">Actif</option>
+      <option value="false">Inactif</option>
+    </select>
+    <button onclick="ajouterProduit()">Ajouter</button>
+  </div>
+
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // === Config Supabase ===
+    const SUPABASE_URL = "https://eiewigilwczsciraepnb.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpZXdpZ2lsd2N6c2NpcmFlcG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4MDcyMDcsImV4cCI6MjA3MTM4MzIwN30.EZkI_3PyG_8hVdCVUlijnWNE1QmOAuoGskb7e6pkmNU";
 
-  <!-- Nos scripts (ordre important) -->
-  <script type="module" src="./src/config.js"></script>
-  <script type="module" src="./src/supabaseClient.js"></script>
-  <script type="module" src="./src/app.js"></script>
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // === Charger les produits ===
+    async function loadProduits() {
+      const list = document.getElementById("listeProduits");
+      const status = document.getElementById("status");
+      list.innerHTML = "<li class='muted'>Chargement...</li>";
+      status.textContent = "";
+
+      let { data, error } = await sb
+        .from("produits")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Erreur Supabase:", error);
+        list.innerHTML = "<li>Erreur : " + error.message + "</li>";
+        status.textContent = "Connexion KO";
+        return;
+      }
+
+      status.textContent = "Connexion OK";
+      document.getElementById("nbProduits").textContent = data.length;
+      document.getElementById("stockTotal").textContent = data.reduce((acc, p) => acc + (p.stock || 0), 0);
+
+      list.innerHTML = "";
+      data.forEach(p => {
+        const li = document.createElement("li");
+        li.textContent = `${p.nom} — ${p.prix_ttc} € — Stock: ${p.stock} — Actif: ${p.actif ? "Oui" : "Non"}`;
+        list.appendChild(li);
+      });
+    }
+
+    // === Ajouter un produit ===
+    async function ajouterProduit() {
+      const nom = document.getElementById("nom").value.trim();
+      const prix = parseFloat(document.getElementById("prix").value);
+      const stock = parseInt(document.getElementById("stock").value);
+      const actif = document.getElementById("actif").value === "true";
+
+      if (!nom || isNaN(prix)) {
+        alert("Nom et prix requis !");
+        return;
+      }
+
+      let { error } = await sb.from("produits").insert([
+        { nom, prix_ttc: prix, stock, actif }
+      ]);
+
+      if (error) {
+        alert("Erreur : " + error.message);
+      } else {
+        alert("Produit ajouté !");
+        loadProduits();
+      }
+    }
+
+    // Auto-chargement au démarrage
+    loadProduits();
+  </script>
 </body>
 </html>
