@@ -1,314 +1,139 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Mini POS — Stock & Caisse (Supabase)</title>
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-  :root{
-    --bg:#0f1222;--bg2:#0b0f1c;--card:#12172a;--card2:#0e1427;
-    --text:#e7eaf0;--muted:#9aa3b2;--border:#1f2a44;
-    --green:#22c55e;--blue:#3b82f6;--red:#ef4444;--yellow:#f59e0b;
-  }
-  *{box-sizing:border-box} html,body{height:100%}
-  body{margin:0;padding:20px;background:linear-gradient(160deg,var(--bg),var(--bg2));
-       color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-  h1{margin:0 0 8px;text-align:center;font-size:26px}
-  .sub{margin:0 0 18px;text-align:center;color:var(--muted);font-size:13px}
-  .app{max-width:1100px;margin:0 auto;display:grid;gap:16px}
-  /* Tabs */
-  .tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-  .tab-btn{border:1px solid var(--border);background:#0c1226;color:var(--text);
-           padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
-  .tab-btn.active{background:linear-gradient(180deg,#59a6ff,#3577e6);border-color:#1d4ed8}
-  .tab{display:none}.tab.active{display:block}
-  /* Cards / UI */
-  .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--border);
-        border-radius:14px;padding:16px;box-shadow:0 12px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03)}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media(max-width:860px){.grid2{grid-template-columns:1fr}}
-  label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
-  input,select{width:100%;padding:10px;border-radius:10px;background:#0c1226;color:var(--text);
-               border:1px solid var(--border);outline:none}
-  .btn{border:1px solid var(--border);background:#0c1226;color:var(--text);
-       padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
-  .btn:hover{filter:brightness(1.08)}
-  .btn.primary{background:linear-gradient(180deg,#2dd46f,#18b354);border-color:#15803d}
-  .btn.blue{background:linear-gradient(180deg,#59a6ff,#3577e6);border-color:#1d4ed8}
-  .btn.red{background:linear-gradient(180deg,#ff6b6b,#ef4444);border-color:#b91c1c}
-  .btn.yellow{background:linear-gradient(180deg,#ffd166,#f59e0b);border-color:#b45309}
-  .muted{color:var(--muted);font-size:13px}
-  .list{display:grid;gap:8px}
-  .row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;
-       border:1px solid var(--border);border-radius:12px;padding:10px;background:#0b1022}
-  .row small{color:var(--muted)}
-  .actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-  .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  @media(max-width:720px){.kpi{grid-template-columns:1fr}}
-  .kpi>div{background:#0b1022;border:1px solid var(--border);border-radius:12px;padding:12px}
-  .kpi .v{font-size:20px;font-weight:800}
-  .cart{background:#0b1022;border:1px solid var(--border);border-radius:12px;padding:10px}
-  .cart li{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;padding:6px 0;border-bottom:1px dashed #223050}
-  .cart li:last-child{border-bottom:none}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini POS — Stock & Caisse</title>
+  <!-- Ici on charge un peu de style simple (noir, sobre) -->
+  <style>
+    body {
+      background: #0d1117;
+      color: white;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .card {
+      background: #161b22;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+    }
+    input, select {
+      padding: 6px;
+      margin: 4px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #0d1117;
+      color: white;
+    }
+    button {
+      padding: 8px 12px;
+      margin-top: 6px;
+      background: green;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: darkgreen;
+    }
+  </style>
 </head>
 <body>
-<div class="app">
+
+  <!-- Titre principal -->
   <h1>Mini POS — Stock & Caisse</h1>
-  <p class="sub">Supabase en direct · RLS actif · Onglets noir 🖤</p>
 
-  <!-- KPIs simples -->
-  <div class="kpi">
-    <div><div class="muted">Produits actifs</div><div class="v" id="kpiActifs">—</div></div>
-    <div><div class="muted">Stock total</div><div class="v" id="kpiStock">—</div></div>
-    <div><div class="muted">Panier</div><div class="v" id="kpiPanier">0,00 €</div></div>
+  <!-- Statistiques en haut -->
+  <div class="card">
+    <div>Produits actifs : <span id="nbProduits">--</span></div>
+    <div>Stock total : <span id="stockTotal">--</span></div>
   </div>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="stock">1 • Gestion des stocks</button>
-    <button class="tab-btn" data-tab="caisse">2 • Caisse</button>
+  <!-- Zone produits -->
+  <div class="card">
+    <h2>Produits</h2>
+    <button onclick="loadProduits()">Rafraîchir</button>
+    <ul id="listeProduits"></ul>
   </div>
 
-  <!-- STOCK -->
-  <section class="tab active" id="tab-stock">
-    <div class="card">
-      <h2>Produits</h2>
-      <div class="muted" id="statusStock">Chargement…</div>
-      <div class="list" id="listStock"></div>
-      <div style="margin-top:12px"><button class="btn" id="refreshStock">Rafraîchir</button></div>
-    </div>
+  <!-- Formulaire pour ajouter un produit -->
+  <div class="card">
+    <h2>Ajouter un produit</h2>
+    <input type="text" id="nom" placeholder="Nom du produit" />
+    <input type="number" id="prix" placeholder="Prix TTC (€)" />
+    <input type="number" id="stock" placeholder="Stock initial" />
+    <select id="actif">
+      <option value="true">Actif</option>
+      <option value="false">Inactif</option>
+    </select>
+    <button onclick="ajouterProduit()">Ajouter</button>
+  </div>
 
-    <div class="card" style="margin-top:12px">
-      <h2>Ajouter un produit</h2>
-      <div class="grid2">
-        <div><label>Nom</label><input id="pName" placeholder="Bague acier"></div>
-        <div><label>Prix TTC (€)</label><input id="pPrice" type="number" step="0.01" min="0" value="0"></div>
-        <div><label>Stock initial</label><input id="pStock" type="number" min="0" value="0"></div>
-        <div><label>Actif ?</label><select id="pActif"><option value="true">Oui</option><option value="false">Non</option></select></div>
-      </div>
-      <div style="margin-top:10px"><button class="btn primary" id="addProd">Ajouter</button></div>
-      <div class="muted" id="statusAdd"></div>
-    </div>
-  </section>
+  <!-- Charger le fichier config.js avec tes clés Supabase -->
+  <script src="config.js"></script>
 
-  <!-- CAISSE -->
-  <section class="tab" id="tab-caisse">
-    <div class="card">
-      <h2>Caisse — Produits actifs</h2>
-      <div class="muted" id="statusCaisse">Chargement…</div>
-      <div class="list" id="listCaisse"></div>
-    </div>
+  <!-- Charger la librairie officielle Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <div class="card" style="margin-top:12px">
-      <h2>Panier</h2>
-      <ul class="cart" id="cartList"></ul>
-      <div class="grid2" style="margin-top:10px">
-        <div>
-          <label>Mode de paiement</label>
-          <select id="mode">
-            <option>CB</option><option>Espèces</option><option>Chèque</option>
-          </select>
-        </div>
-        <div>
-          <label>Client ID (optionnel)</label>
-          <input id="clientId" placeholder="uuid client (ou vide)">
-        </div>
-      </div>
-      <div style="margin-top:10px" class="actions">
-        <button class="btn" id="clearCart">Vider</button>
-        <button class="btn primary" id="checkout">Encaisser</button>
-      </div>
-      <div class="muted" id="statusPay"></div>
-    </div>
-  </section>
-</div>
+  <!-- Script principal -->
+  <script>
+    // === Connexion à Supabase avec les variables venant de config.js ===
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-<script>
-/* ---- CONFIG SUPABASE ---- */
-const SUPABASE_URL = "https://eiewigilwczsciraepnb.supabase.co";       // ← remplace
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpZXdpZ2lsd2N6c2NpcmFlcG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4MDcyMDcsImV4cCI6MjA3MTM4MzIwN30.EZkI_3PyG_8hVdCVUlijnWNE1QmOAuoGskb7e6pkmNU";                      // ← remplace
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // === Charger les produits depuis la base ===
+    async function loadProduits() {
+      const list = document.getElementById("listeProduits");
+      list.innerHTML = "<li>Chargement...</li>";
 
-/* ---- HELPERS ---- */
-const € = n => (Number(n||0)).toFixed(2) + " €";
-const $ = s => document.querySelector(s);
-const el = (t,a={}) => Object.assign(document.createElement(t), a);
+      let { data, error } = await sb
+        .from("produits")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-/* ---- STATE ---- */
-let produits = [];           // {id, nom, prix_ttc, stock, actif}
-let panier = [];             // {id, nom, pu, qte}
+      if (error) {
+        list.innerHTML = "<li>Erreur : " + error.message + "</li>";
+        return;
+      }
 
-/* ---- TABS ---- */
-document.querySelectorAll(".tab-btn").forEach(b=>{
-  b.onclick=()=>{
-    document.querySelectorAll(".tab-btn").forEach(x=>x.classList.remove("active"));
-    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active");
-    document.getElementById("tab-"+b.dataset.tab).classList.add("active");
-  };
-});
+      // Mettre à jour les stats
+      document.getElementById("nbProduits").textContent = data.length;
+      document.getElementById("stockTotal").textContent = data.reduce((acc, p) => acc + (p.stock || 0), 0);
 
-/* ---- LOAD PRODUITS ---- */
-async function loadStock(){
-  $("#statusStock").textContent="Chargement…";
-  const { data, error } = await sb
-    .from('produits')
-    .select('id, nom, prix_ttc, stock, actif')
-    .order('created_at', { ascending:false });
-  if(error){ $("#statusStock").textContent="Erreur : "+error.message; return; }
-  produits = data||[];
-  renderStock();
-  renderCaisseList();
-  updateKPIs();
-}
-function updateKPIs(){
-  const actifs = produits.filter(p=>p.actif).length;
-  const stockTotal = produits.reduce((s,p)=>s+(p.stock||0),0);
-  $("#kpiActifs").textContent = actifs;
-  $("#kpiStock").textContent = stockTotal;
-  const totalPanier = panier.reduce((s,i)=>s+i.pu*i.qte,0);
-  $("#kpiPanier").textContent = €(totalPanier);
-}
+      // Afficher les produits
+      list.innerHTML = "";
+      data.forEach(p => {
+        const li = document.createElement("li");
+        li.textContent = `${p.nom} — ${p.prix_ttc}€ — Stock: ${p.stock} — Actif: ${p.actif ? "Oui" : "Non"}`;
+        list.appendChild(li);
+      });
+    }
 
-/* ---- RENDER STOCK ---- */
-function renderStock(){
-  const wrap = $("#listStock"); wrap.innerHTML="";
-  if(!produits.length){ $("#statusStock").textContent="Aucun produit."; return; }
-  $("#statusStock").textContent = `${produits.length} produit(s)`;
-  produits.forEach(p=>{
-    const row = el("div",{className:"row"});
-    const left = el("div",{innerHTML:`<strong>${p.nom}</strong><br><small>Stock: ${p.stock??0} • actif: ${p.actif?'oui':'non'}</small>`});
-    const mid = el("div",{innerHTML:`<strong>${€(p.prix_ttc)}</strong>`});
-    const act = el("div",{className:"actions"});
-    const bPlus = el("button",{className:"btn blue",innerText:"+1"});
-    const bMoins= el("button",{className:"btn red",innerText:"-1"});
-    const bToggle= el("button",{className:"btn yellow",innerText: p.actif?"Désactiver":"Activer"});
-    bPlus.onclick=()=>updateProduit(p.id,{stock:(p.stock||0)+1});
-    bMoins.onclick=()=>updateProduit(p.id,{stock:Math.max(0,(p.stock||0)-1)});
-    bToggle.onclick=()=>updateProduit(p.id,{actif:!p.actif});
-    act.append(bPlus,bMoins,bToggle);
-    row.append(left, mid, act); wrap.append(row);
-  });
-}
+    // === Ajouter un produit via le formulaire ===
+    async function ajouterProduit() {
+      const nom = document.getElementById("nom").value;
+      const prix = parseFloat(document.getElementById("prix").value);
+      const stock = parseInt(document.getElementById("stock").value);
+      const actif = document.getElementById("actif").value === "true";
 
-/* ---- UPDATE PRODUIT ---- */
-async function updateProduit(id, patch){
-  const { error } = await sb.from('produits').update(patch).eq('id', id);
-  if(error){ alert("Erreur mise à jour: "+error.message); return; }
-  loadStock();
-}
+      let { error } = await sb.from("produits").insert([
+        { nom, prix_ttc: prix, stock, actif }
+      ]);
 
-/* ---- ADD PRODUIT ---- */
-$("#addProd").onclick = async ()=>{
-  const nom = $("#pName").value.trim();
-  const prix = Number($("#pPrice").value||0);
-  const stock = parseInt($("#pStock").value||0,10);
-  const actif = $("#pActif").value==="true";
-  if(!nom){ $("#statusAdd").textContent="Nom requis."; return; }
-  const { error } = await sb.from('produits').insert({ nom, prix_ttc:prix, stock, actif });
-  if(error){ $("#statusAdd").textContent="Erreur: "+error.message; return; }
-  $("#statusAdd").textContent="Produit ajouté.";
-  $("#pName").value=""; $("#pPrice").value="0"; $("#pStock").value="0"; $("#pActif").value="true";
-  loadStock();
-};
-$("#refreshStock").onclick = loadStock;
+      if (error) {
+        alert("Erreur : " + error.message);
+      } else {
+        alert("Produit ajouté !");
+        loadProduits(); // rafraîchir la liste
+      }
+    }
 
-/* ---- CAISSE : LISTE PRODUITS ACTIFS ---- */
-function renderCaisseList(){
-  const wrap = $("#listCaisse"); wrap.innerHTML="";
-  const actifs = produits.filter(p=>p.actif && (p.stock||0)>0);
-  if(!actifs.length){ $("#statusCaisse").textContent="Aucun produit disponible."; return; }
-  $("#statusCaisse").textContent=`${actifs.length} produit(s) disponibles`;
-  actifs.forEach(p=>{
-    const row = el("div",{className:"row"});
-    const left = el("div",{innerHTML:`<strong>${p.nom}</strong><br><small>Stock: ${p.stock}</small>`});
-    const mid = el("div",{innerHTML:`<strong>${€(p.prix_ttc)}</strong>`});
-    const act = el("div",{className:"actions"});
-    const qty = el("input",{type:"number",min:"1",value:"1",style:"width:80px"});
-    const add = el("button",{className:"btn primary",innerText:"Ajouter"});
-    add.onclick=()=>{
-      const q = Math.max(1, parseInt(qty.value||1,10));
-      if(p.stock < q){ alert("Stock insuffisant"); return; }
-      const ex = panier.find(i=>i.id===p.id);
-      if(ex) ex.qte += q; else panier.push({id:p.id, nom:p.nom, pu:Number(p.prix_ttc||0), qte:q});
-      renderPanier(); updateKPIs();
-    };
-    act.append(qty, add);
-    row.append(left,mid,act); wrap.append(row);
-  });
-}
-
-/* ---- PANIER ---- */
-function renderPanier(){
-  const UL = $("#cartList"); UL.innerHTML="";
-  if(!panier.length){ UL.innerHTML='<li class="muted">Panier vide</li>'; return; }
-  panier.forEach((it,idx)=>{
-    const li=el("li");
-    li.append(
-      el("div",{innerText:it.nom}),
-      el("div",{innerText:`x${it.qte}`}),
-      el("div",{innerText:€(it.pu*it.qte)}),
-      (()=>{const b=el("button",{className:"btn red",innerText:"Retirer"}); b.onclick=()=>{panier.splice(idx,1);renderPanier();updateKPIs();}; return b;})()
-    );
-    UL.append(li);
-  });
-  const tot = panier.reduce((s,i)=>s+i.pu*i.qte,0);
-  const liTot=el("li"); liTot.style.borderBottom="none";
-  liTot.append(el("div",{innerHTML:"<strong>Total</strong>"}),el("div"),el("div",{innerHTML:"<strong>"+€(tot)+"</strong>"}),el("div"));
-  UL.append(liTot);
-}
-$("#clearCart").onclick=()=>{panier.length=0;renderPanier();updateKPIs();};
-
-/* ---- ENCAISSER ---- */
-$("#checkout").onclick = async ()=>{
-  if(!panier.length){ $("#statusPay").textContent="Panier vide."; return; }
-  // Vérif stock local
-  for(const it of panier){
-    const p = produits.find(x=>x.id===it.id);
-    if(!p || p.stock < it.qte){ $("#statusPay").textContent=`Stock insuffisant pour ${it.nom}.`; return; }
-  }
-  const total_ttc = panier.reduce((s,i)=>s+i.pu*i.qte,0);
-  const mode = $("#mode").value;
-  const client_id = ($("#clientId").value||"").trim() || null;
-
-  $("#statusPay").textContent="Encaissement en cours…";
-
-  // 1) Créer la vente
-  const { data:vente, error:e1 } = await sb
-    .from('ventes')
-    .insert({ total_ttc, mode_paiement:mode, client_id })
-    .select('id')
-    .single();
-  if(e1){ $("#statusPay").textContent="Erreur vente: "+e1.message; return; }
-
-  // 2) Lignes de vente
-  const lignes = panier.map(it=>({
-    vente_id: vente.id,
-    produit_id: it.id,
-    quantite: it.qte,
-    prix_unitaire_ttc: it.pu,
-    total_ttc: it.pu*it.qte
-  }));
-  const { error:e2 } = await sb.from('ventes_lignes').insert(lignes);
-  if(e2){ $("#statusPay").textContent="Erreur lignes: "+e2.message; return; }
-
-  // 3) Décrémenter le stock (simple: recalcul local puis update)
-  for(const it of panier){
-    const p = produits.find(x=>x.id===it.id);
-    const nv = Math.max(0,(p.stock||0)-it.qte);
-    await sb.from('produits').update({stock:nv}).eq('id', it.id);
-  }
-
-  $("#statusPay").textContent=`Vente enregistrée (${€(total_ttc)}).`;
-  panier.length=0; renderPanier(); updateKPIs();
-  loadStock(); // refresh listes
-};
-
-/* ---- INIT ---- */
-loadStock();
-</script>
+    // Charger au démarrage
+    loadProduits();
+  </script>
 </body>
 </html>
