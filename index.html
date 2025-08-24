@@ -3,61 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mini POS — Test Produits</title>
+  <title>Mini POS — Produits</title>
   <style>
-    body {
-      background: #0d1117;
-      color: white;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    h1 { text-align: center; }
-    .card {
-      background: #161b22;
-      padding: 15px;
-      margin: 10px 0;
-      border-radius: 8px;
-    }
-    input, select {
-      padding: 6px;
-      margin: 4px;
-      border-radius: 4px;
-      border: 1px solid #444;
-      background: #0d1117;
-      color: white;
-    }
-    button {
-      padding: 8px 12px;
-      margin-top: 6px;
-      background: green;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover { background: darkgreen; }
-    .muted { color: #9ca3af }
+    body { background:#0d1117; color:#fff; font-family: Arial, sans-serif; padding:20px; }
+    h1 { text-align:center; }
+    .card { background:#161b22; padding:15px; margin:10px 0; border-radius:8px; }
+    input, select { padding:6px; margin:4px; border-radius:4px; border:1px solid #444; background:#0d1117; color:#fff; }
+    button { padding:8px 12px; margin-top:6px; background:green; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+    button:hover { background:darkgreen; }
+    .muted { color:#9ca3af; }
   </style>
 </head>
 <body>
-
   <h1>Mini POS — Test Produits</h1>
 
-  <!-- Statistiques -->
   <div class="card">
     <div>Produits actifs : <span id="nbProduits">--</span></div>
     <div>Stock total : <span id="stockTotal">--</span></div>
   </div>
 
-  <!-- Liste produits -->
   <div class="card">
     <h2>Produits</h2>
-    <button onclick="loadProduits()">Rafraîchir</button>
+    <button id="btnRefresh">Rafraîchir</button>
     <ul id="listeProduits"></ul>
     <p id="status" class="muted"></p>
   </div>
 
-  <!-- Formulaire -->
   <div class="card">
     <h2>Ajouter un produit</h2>
     <input type="text" id="nom" placeholder="Nom du produit" />
@@ -67,75 +38,15 @@
       <option value="true">Actif</option>
       <option value="false">Inactif</option>
     </select>
-    <button onclick="ajouterProduit()">Ajouter</button>
+    <button id="btnAdd">Ajouter</button>
   </div>
 
-  <!-- Supabase -->
+  <!-- Supabase (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    // === Config Supabase ===
-    const SUPABASE_URL = "https://eiewigilwczsciraepnb.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpZXdpZ2lsd2N6c2NpcmFlcG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4MDcyMDcsImV4cCI6MjA3MTM4MzIwN30.EZkI_3PyG_8hVdCVUlijnWNE1QmOAuoGskb7e6pkmNU";
 
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // === Charger les produits ===
-    async function loadProduits() {
-      const list = document.getElementById("listeProduits");
-      const status = document.getElementById("status");
-      list.innerHTML = "<li class='muted'>Chargement...</li>";
-      status.textContent = "";
-
-      let { data, error } = await sb
-        .from("produits")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Erreur Supabase:", error);
-        list.innerHTML = "<li>Erreur : " + error.message + "</li>";
-        status.textContent = "Connexion KO";
-        return;
-      }
-
-      status.textContent = "Connexion OK";
-      document.getElementById("nbProduits").textContent = data.length;
-      document.getElementById("stockTotal").textContent = data.reduce((acc, p) => acc + (p.stock || 0), 0);
-
-      list.innerHTML = "";
-      data.forEach(p => {
-        const li = document.createElement("li");
-        li.textContent = `${p.nom} — ${p.prix_ttc} € — Stock: ${p.stock} — Actif: ${p.actif ? "Oui" : "Non"}`;
-        list.appendChild(li);
-      });
-    }
-
-    // === Ajouter un produit ===
-    async function ajouterProduit() {
-      const nom = document.getElementById("nom").value.trim();
-      const prix = parseFloat(document.getElementById("prix").value);
-      const stock = parseInt(document.getElementById("stock").value);
-      const actif = document.getElementById("actif").value === "true";
-
-      if (!nom || isNaN(prix)) {
-        alert("Nom et prix requis !");
-        return;
-      }
-
-      let { error } = await sb.from("produits").insert([
-        { nom, prix_ttc: prix, stock, actif }
-      ]);
-
-      if (error) {
-        alert("Erreur : " + error.message);
-      } else {
-        alert("Produit ajouté !");
-        loadProduits();
-      }
-    }
-
-    // Auto-chargement au démarrage
-    loadProduits();
-  </script>
+  <!-- Nos modules -->
+  <script type="module" src="./src/config.js"></script>
+  <script type="module" src="./src/supabaseClient.js"></script>
+  <script type="module" src="./src/app.js"></script>
 </body>
 </html>
