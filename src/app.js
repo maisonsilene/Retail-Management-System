@@ -42,26 +42,28 @@ function renderList(rows) {
 }
 
 async function loadProduits() {
-  setStatus("Chargement…");
+  setStatus("Test connexion + chargement…");
   els.list.innerHTML = "";
 
-  // 👉 correspond exactement à tes colonnes FR
   const { data, error } = await sb
     .from("produits")
-    .select("id,nom,prix_ttc,actif,stock,tva,created_at")
-    .order("created_at", { ascending: false });
+    .select("*")   // on prend toutes les colonnes, simple pour tester
+    .limit(5);     // on limite à 5 lignes pour l’affichage
 
   if (error) {
     console.error("Supabase select error:", error);
-    setConn(false, `— ${error.message}`);
-    setStatus(error.message || "Erreur lecture produits (voir console).");
+    setConn(false);
+    // 👉 on affiche l'erreur en toutes lettres dans l'UI
+    setStatus("Erreur: " + error.message);
     return;
   }
 
   setConn(true, `— ${data.length} élément(s)`);
-  renderList(data);
+  // 👉 on affiche le contenu brut en JSON pour voir ce qui sort
+  els.list.innerHTML = data.map(p => `<li>${JSON.stringify(p)}</li>`).join("");
   setStatus("");
 }
+
 
 async function addProduit(e) {
   e.preventDefault();
