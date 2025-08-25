@@ -3,6 +3,7 @@
  * Colonnes: id, created_at, nom, prix_ttc, tva, actif, stock
  */
 import { sb } from "./supabaseClient.js";
+import { countActive } from "./utils.js";
 
 // Elements UI
 const els = {
@@ -37,7 +38,7 @@ async function loadProduits() {
   }
 
   setStatus("Connexion OK");
-  els.nb.textContent = data.length;
+  els.nb.textContent = countActive(data);
   els.total.textContent = data.reduce((acc, p) => acc + (p.stock || 0), 0);
 
   els.list.innerHTML = data.map(p =>
