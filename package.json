@@ -1,0 +1,8 @@
+{
+  "name": "retail-management-system",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node test/utils.test.js"
+  }
+}
