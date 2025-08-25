@@ -15,30 +15,32 @@
   </style>
 </head>
 <body>
-  <h1>Mini POS — Test Produits</h1>
+  <div id="tab-stocks">
+    <h1>Mini POS — Test Produits</h1>
 
-  <div class="card">
-    <div>Produits actifs : <span id="nbProduits">--</span></div>
-    <div>Stock total : <span id="stockTotal">--</span></div>
-  </div>
+    <div class="card">
+      <div>Produits actifs : <span id="nbProduits">--</span></div>
+      <div>Stock total : <span id="stockTotal">--</span></div>
+    </div>
 
-  <div class="card">
-    <h2>Produits</h2>
-    <button id="btnRefresh">Rafraîchir</button>
-    <ul id="listeProduits"></ul>
-    <p id="status" class="muted"></p>
-  </div>
+    <div class="card">
+      <h2>Produits</h2>
+      <button id="btnRefresh">Rafraîchir</button>
+      <ul id="listeProduits"></ul>
+      <p id="status" class="muted"></p>
+    </div>
 
-  <div class="card">
-    <h2>Ajouter un produit</h2>
-    <input type="text" id="nom" placeholder="Nom du produit" />
-    <input type="number" id="prix" placeholder="Prix TTC (€)" />
-    <input type="number" id="stock" placeholder="Stock initial" />
-    <select id="actif">
-      <option value="true">Actif</option>
-      <option value="false">Inactif</option>
-    </select>
-    <button id="btnAdd">Ajouter</button>
+    <div class="card">
+      <h2>Ajouter un produit</h2>
+      <input type="text" id="nom" placeholder="Nom du produit" />
+      <input type="number" id="prix" placeholder="Prix TTC (€)" />
+      <input type="number" id="stock" placeholder="Stock initial" />
+      <select id="actif">
+        <option value="true">Actif</option>
+        <option value="false">Inactif</option>
+      </select>
+      <button id="btnAdd">Ajouter</button>
+    </div>
   </div>
 
   <!-- Supabase (CDN) -->
@@ -47,6 +49,12 @@
   <!-- Nos modules -->
   <script type="module" src="./src/config.js"></script>
   <script type="module" src="./src/supabaseClient.js"></script>
-  <script type="module" src="./src/app.js"></script>
+  <script type="module">
+    import { initStocksTab } from "./src/stocks.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initStocksTab();
+    });
+  </script>
 </body>
 </html>
