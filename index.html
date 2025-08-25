@@ -22,6 +22,14 @@
     <div>Stock total : <span id="stockTotal">--</span></div>
   </div>
 
+  <div class="card" id="tab-caisse">
+    <h2>Caisse</h2>
+    <select id="caisseProduit"></select>
+    <input type="number" id="caisseQuantite" placeholder="Quantité" min="1" value="1" />
+    <button id="btnEncaisser">Encaisser</button>
+    <p id="caisseStatus" class="muted"></p>
+  </div>
+
   <div class="card">
     <h2>Produits</h2>
     <button id="btnRefresh">Rafraîchir</button>
@@ -48,5 +56,6 @@
   <script type="module" src="./src/config.js"></script>
   <script type="module" src="./src/supabaseClient.js"></script>
   <script type="module" src="./src/app.js"></script>
+  <script type="module" src="./src/caisse.js"></script>
 </body>
 </html>
