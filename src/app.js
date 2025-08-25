@@ -4,6 +4,7 @@
  */
 import { sb } from "./supabaseClient.js";
 import { countActive } from "./utils.js";
+import { initJournalTab } from "./journal.js";
 
 // Elements UI
 const els = {
@@ -18,6 +19,18 @@ const els = {
   stock: document.getElementById("stock"),
   actif: document.getElementById("actif"),
 };
+
+// gestion des onglets
+const tabs = document.querySelectorAll(".tab");
+const tabButtons = document.querySelectorAll("[data-tab]");
+tabButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    tabs.forEach(tab => tab.classList.toggle("active", tab.id === btn.dataset.tab));
+    if (btn.dataset.tab === "tab-journal") {
+      initJournalTab();
+    }
+  });
+});
 
 function setStatus(msg="") { els.status.textContent = msg; }
 
