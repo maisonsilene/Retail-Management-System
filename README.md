@@ -38,3 +38,7 @@
 - total_ttc (numeric)
 - vente_id (uuid, FK → ventes.id)
 - produit_id (uuid, FK → produits.id)
+
+## Remarques
+- La table `journal` n'existe pas. Le suivi des ventes se fait via les tables `ventes` et `ventes_lignes`.
+- L'onglet Caisse appelle le RPC transactionnel `vente_simple` qui insère la vente, ajoute la ligne correspondante et décrémente `produits.stock`.
