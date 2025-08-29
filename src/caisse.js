@@ -39,7 +39,7 @@ async function vendreProduit(event) {
   if (event.target.tagName !== "BUTTON") return;
   const id = event.target.dataset.id;
 
-  const { error } = await sb.rpc("vente_simple", { produit_id: id });
+  const { error } = await sb.rpc("vente_simple", { p_produit: id, p_qty: 1 });
 
   if (error) {
     alert("Erreur : " + error.message);
