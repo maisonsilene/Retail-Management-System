@@ -38,11 +38,8 @@ async function loadProduits() {
 async function vendreProduit(event) {
   if (event.target.tagName !== "BUTTON") return;
   const id = event.target.dataset.id;
-  const prix = parseFloat(event.target.dataset.prix);
 
-  const { error } = await sb
-    .from("journal")
-    .insert([{ produit_id: id, montant: prix }]);
+  const { error } = await sb.rpc("vente_simple", { produit_id: id });
 
   if (error) {
     alert("Erreur : " + error.message);
@@ -50,6 +47,7 @@ async function vendreProduit(event) {
   }
 
   alert("Vente enregistrée !");
+  loadProduits();
 }
 
 els.refresh.addEventListener("click", loadProduits);
