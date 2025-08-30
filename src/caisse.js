@@ -54,3 +54,5 @@ els.refresh.addEventListener("click", loadProduits);
 els.list.addEventListener("click", vendreProduit);
 
 loadProduits();
+
+export { loadProduits, vendreProduit };
